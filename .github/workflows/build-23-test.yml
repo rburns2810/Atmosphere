@@ -1,0 +1,38 @@
+name: Build Atmosphere (23.0.0 test)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build toolchain image from the repo's Dockerfile
+        run: docker build -t ams-build .
+
+      - name: Build libnx from git, then Atmosphere
+        run: |
+          docker run --rm --user root -v "$PWD":/src -w /src ams-build bash -lc '
+            set -euo pipefail
+            export DEVKITPRO=/opt/devkitpro DEVKITA64=/opt/devkitpro/devkitA64
+            export PATH=$DEVKITPRO/tools/bin:$DEVKITA64/bin:$PATH
+            apt-get update -qq && apt-get install -y -qq zip >/dev/null
+            git config --global --add safe.directory /src
+            git clone --depth 1 https://github.com/switchbrew/libnx.git /tmp/libnx
+            echo "libnx revision: $(git -C /tmp/libnx rev-parse HEAD)"
+            make -C /tmp/libnx -j"$(nproc)"
+            make -C /tmp/libnx/nx install
+            make -j"$(nproc)" dist-no-debug-nx_release
+          '
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atmosphere-23-test
+          path: out/**/*.zip
+          if-no-files-found: error
