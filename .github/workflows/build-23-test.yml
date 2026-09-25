@@ -28,6 +28,7 @@ jobs:
             echo "libnx revision: $(git -C /tmp/libnx rev-parse HEAD)"
             make -C /tmp/libnx -j"$(nproc)"
             make -C /tmp/libnx/nx install
+            make -C troposphere/haze   # build serially first: its shader step races under -j
             make -j"$(nproc)" dist-no-debug-nx_release
           '
 
